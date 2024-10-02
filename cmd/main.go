@@ -51,7 +51,6 @@ func exportLongTermTerminatedInstancesToCSV(ctx context.Context, projectId strin
 	}
 
 	fmt.Println("Records saved to", csvFilePath)
-
 }
 
 func exportIdleExternalIPsToCSV(ctx context.Context, projectID string) {
@@ -65,11 +64,14 @@ func exportIdleExternalIPsToCSV(ctx context.Context, projectID string) {
 		records[i] = (*compute.GetIpSummary(ip)).ConvertToStringSlice()
 	}
 
-	err := export.ExportToCSV(records, "idle_external_ips.csv")
+	csvFilePath := "idle_external_ips.csv"
+	err := export.ExportToCSV(records, csvFilePath)
 
 	if err != nil {
 		log.Fatalf("Failure when exporting to CSV file")
 	}
+
+	fmt.Println("Records saved to", csvFilePath)
 }
 
 func main() {
