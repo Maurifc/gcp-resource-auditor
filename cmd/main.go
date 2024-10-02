@@ -54,7 +54,11 @@ func exportIdleExternalIPsToCSV(ctx context.Context, projectID string) {
 		records[i] = (*compute.GetIpSummary(ip)).ConvertToStringSlice()
 	}
 
-	export.ExportToCSV(records, "idle_external_ips.csv")
+	err := export.ExportToCSV(records, "idle_external_ips.csv")
+
+	if err != nil {
+		log.Fatalf("Failure when exporting to CSV file")
+	}
 }
 
 func main() {
