@@ -10,7 +10,7 @@ import (
 	"github.com/maurifc/gcp-resource-auditor/internal/export"
 )
 
-func displayLongTermTerminatedInstances(ctx context.Context, projectId string, daysThreshold int) {
+func exportLongTermTerminatedInstancesToCSV(ctx context.Context, projectId string, daysThreshold int) {
 	instances, err := compute.ListAllInstances(ctx, projectId)
 	if err != nil {
 		log.Fatalf("Failed to retrieve instances: %v", err)
@@ -26,7 +26,6 @@ func displayLongTermTerminatedInstances(ctx context.Context, projectId string, d
 		return
 	}
 
-	fmt.Printf(">>> Listing instances terminated for more than %d days <<<\n", daysThreshold)
 	longTermTerminatedInstances, err := terminatedInstances.FilterInstancesStoppedBefore(daysThreshold)
 
 	if err != nil {
@@ -38,9 +37,21 @@ func displayLongTermTerminatedInstances(ctx context.Context, projectId string, d
 		return
 	}
 
-	for _, instance := range longTermTerminatedInstances {
-		fmt.Println(compute.GetSummary(instance))
+	records := make([][]string, len(longTermTerminatedInstances))
+
+	fmt.Printf("Found %d long term terminated Instances\n", len(longTermTerminatedInstances))
+	for i, instance := range longTermTerminatedInstances {
+		records[i] = compute.GetInstanceSummary(instance).ConvertToStringSlice()
 	}
+
+	csvFilePath := "compute_instances_terminated.csv"
+	err = export.ExportToCSV(records, csvFilePath)
+	if err != nil {
+		log.Fatalf("Failure when exporting to CSV file")
+	}
+
+	fmt.Println("Records saved to", csvFilePath)
+
 }
 
 func exportIdleExternalIPsToCSV(ctx context.Context, projectID string) {
@@ -75,7 +86,7 @@ func main() {
 	case "ips":
 		exportIdleExternalIPsToCSV(ctx, projectID)
 	case "instances":
-		displayLongTermTerminatedInstances(ctx, projectID, 90)
+		exportLongTermTerminatedInstancesToCSV(ctx, projectID, 90)
 	default:
 		fmt.Printf("Command '%s' not found\n", command)
 		os.Exit(1)

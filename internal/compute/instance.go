@@ -15,6 +15,15 @@ import (
 
 type ComputeInstanceList []*computepb.Instance
 
+type ComputeInstanceSummary struct {
+	Name          string
+	OS            string
+	Status        string
+	MachineType   string
+	LastStartDate string
+	LastStopDate  string
+}
+
 func (list *ComputeInstanceList) Status(instanceStatus string) (ComputeInstanceList, error) {
 	var filteredInstances ComputeInstanceList
 
@@ -49,22 +58,26 @@ func (list *ComputeInstanceList) FilterInstancesStoppedBefore(days int) (Compute
 	return filteredInstances, nil
 }
 
-func GetSummary(instance *computepb.Instance) string {
-	var sb strings.Builder
-
-	sb.WriteString(fmt.Sprintf("Name: %s\n", *instance.Name))
-	sb.WriteString(fmt.Sprintf("OS: %s\n", getOs(instance)))
-	sb.WriteString(fmt.Sprintf("Status: %s\n", *instance.Status))
-	sb.WriteString(fmt.Sprintf("Machine Type: %s\n", getMachineType(*instance.MachineType)))
-	sb.WriteString("Disks:\n")
-
-	for _, disk := range instance.Disks {
-		sb.WriteString(fmt.Sprintf("  %s: %dGB\n", *disk.DeviceName, *disk.DiskSizeGb))
+func GetInstanceSummary(instance *computepb.Instance) *ComputeInstanceSummary {
+	return &ComputeInstanceSummary{
+		Name:          *instance.Name,
+		OS:            getOs(instance),
+		Status:        *instance.Status,
+		MachineType:   getMachineType(*instance.MachineType),
+		LastStartDate: *instance.LastStartTimestamp,
+		LastStopDate:  *instance.LastStopTimestamp,
 	}
+}
 
-	sb.WriteString(fmt.Sprintf("Stop date: %s\nLast start date: %s\n", formatDate(instance.LastStopTimestamp), formatDate(instance.LastStartTimestamp)))
-
-	return sb.String()
+func (instanceSummary *ComputeInstanceSummary) ConvertToStringSlice() []string {
+	return []string{
+		instanceSummary.Name,
+		instanceSummary.OS,
+		instanceSummary.Status,
+		instanceSummary.MachineType,
+		instanceSummary.LastStartDate,
+		instanceSummary.LastStopDate,
+	}
 }
 
 func ListAllInstances(ctx context.Context, projectID string) (ComputeInstanceList, error) {
