@@ -5,10 +5,15 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"path"
 
 	"github.com/maurifc/gcp-resource-auditor/internal/compute"
 	"github.com/maurifc/gcp-resource-auditor/internal/export"
 )
+
+const OUTPUT_DIR = "output"
+const TERMINATED_COMPUTE_INSTANCES_FILE = "compute_instances_terminated.csv"
+const IDLE_EXTERNAL_IPS_FILE = "idle_external_ips.csv"
 
 func exportLongTermTerminatedInstancesToCSV(ctx context.Context, projectId string, daysThreshold int) {
 	instances, err := compute.ListAllInstances(ctx, projectId)
@@ -44,13 +49,13 @@ func exportLongTermTerminatedInstancesToCSV(ctx context.Context, projectId strin
 		records[i] = compute.GetInstanceSummary(instance).ConvertToStringSlice()
 	}
 
-	csvFilePath := "compute_instances_terminated.csv"
-	err = export.ExportToCSV(records, csvFilePath)
+	destinationFilePath := path.Join(OUTPUT_DIR, TERMINATED_COMPUTE_INSTANCES_FILE)
+	err = export.ExportToCSV(records, destinationFilePath)
 	if err != nil {
 		log.Fatalf("Failure when exporting to CSV file")
 	}
 
-	fmt.Println("Records saved to", csvFilePath)
+	fmt.Println("Records saved to", destinationFilePath)
 }
 
 func exportIdleExternalIPsToCSV(ctx context.Context, projectID string) {
@@ -63,15 +68,15 @@ func exportIdleExternalIPsToCSV(ctx context.Context, projectID string) {
 	for i, ip := range idleExternalIPs {
 		records[i] = (*compute.GetIpSummary(ip)).ConvertToStringSlice()
 	}
-
-	csvFilePath := "idle_external_ips.csv"
-	err := export.ExportToCSV(records, csvFilePath)
+	
+	destinationFilePath := path.Join(OUTPUT_DIR, IDLE_EXTERNAL_IPS_FILE)
+	err := export.ExportToCSV(records, destinationFilePath)
 
 	if err != nil {
 		log.Fatalf("Failure when exporting to CSV file")
 	}
 
-	fmt.Println("Records saved to", csvFilePath)
+	fmt.Println("Records saved to", destinationFilePath)
 }
 
 func main() {
