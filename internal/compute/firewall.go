@@ -131,6 +131,22 @@ func (ruleList *FirewallRuleList) FilterBySourceRange(ipRange string) (FirewallR
 	return filteredList, nil
 }
 
+func (ruleList *FirewallRuleList) FilterByAction(action string) (FirewallRuleList, error) {
+	var filteredList FirewallRuleList
+
+	if ruleList == nil || len(*ruleList) == 0 {
+		return nil, fmt.Errorf("cannot filter an empty list")
+	}
+
+	for _, rule := range *ruleList {
+		if getRuleAction(rule) == action {
+			filteredList = append(filteredList, rule)
+		}
+	}
+
+	return filteredList, nil
+}
+
 func ListAllFirewallRules(ctx context.Context, projectID string) (FirewallRuleList, error) {
 	var rules FirewallRuleList
 
