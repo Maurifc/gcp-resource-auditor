@@ -5,23 +5,23 @@ import (
 	"fmt"
 	"log"
 	"os"
-	"path"
+	"strings"
 	"sync"
 
 	"github.com/maurifc/gcp-resource-auditor/internal/compute"
 	"github.com/maurifc/gcp-resource-auditor/internal/export"
+	"github.com/maurifc/gcp-resource-auditor/internal/utils"
 )
 
 var wg sync.WaitGroup
 
-const OUTPUT_DIR = "output"
 const TERMINATED_COMPUTE_INSTANCES_FILE = "compute_instances_terminated.csv"
 const IDLE_EXTERNAL_IPS_FILE = "idle_external_ips.csv"
 const FIREWALL_RULES_FILE = "firewall_permissive_rules.csv"
 
-func exportLongTermTerminatedInstancesToCSV(ctx context.Context, projectId string, daysThreshold int) {
+func exportLongTermTerminatedInstancesToCSV(ctx context.Context, projectID string, daysThreshold int) {
 	defer wg.Done()
-	instances, err := compute.ListAllInstances(ctx, projectId)
+	instances, err := compute.ListAllInstances(ctx, projectID)
 	if err != nil {
 		log.Fatalf("Failed to retrieve instances: %v", err)
 	}
@@ -51,10 +51,10 @@ func exportLongTermTerminatedInstancesToCSV(ctx context.Context, projectId strin
 
 	fmt.Printf("Found %d long term terminated Instances\n", len(longTermTerminatedInstances))
 	for i, instance := range longTermTerminatedInstances {
-		records[i] = append(compute.GetInstanceSummary(instance).ConvertToStringSlice(), projectId)
+		records[i] = append(compute.GetInstanceSummary(instance).ConvertToStringSlice(), projectID)
 	}
 
-	destinationFilePath := path.Join(OUTPUT_DIR, TERMINATED_COMPUTE_INSTANCES_FILE)
+	destinationFilePath := utils.GetDestinationFilePath(projectID, TERMINATED_COMPUTE_INSTANCES_FILE)
 	header := append(compute.GetStructFields(compute.ComputeInstanceSummary{}), "ProjectID")
 	err = export.ExportToCSV(header, records, destinationFilePath)
 	if err != nil {
@@ -76,7 +76,7 @@ func exportIdleExternalIPsToCSV(ctx context.Context, projectID string) {
 		records[i] = append((*compute.GetIpSummary(ip)).ConvertToStringSlice(), projectID)
 	}
 
-	destinationFilePath := path.Join(OUTPUT_DIR, IDLE_EXTERNAL_IPS_FILE)
+	destinationFilePath := utils.GetDestinationFilePath(projectID, IDLE_EXTERNAL_IPS_FILE)
 	header := append(compute.GetStructFields(compute.IpAddressSummary{}), "ProjectID")
 	err := export.ExportToCSV(header, records, destinationFilePath)
 
@@ -108,8 +108,8 @@ func exportPermissiveRulesToCSV(ctx context.Context, projectID string) {
 		records[i] = record
 	}
 
-	destinationFilePath := path.Join(OUTPUT_DIR, FIREWALL_RULES_FILE)
 	header := append(compute.GetStructFields(compute.FirewallRuleSummary{}), "ProjectID")
+	destinationFilePath := utils.GetDestinationFilePath(projectID, FIREWALL_RULES_FILE)
 	err := export.ExportToCSV(header, records, destinationFilePath)
 
 	if err != nil {
@@ -126,25 +126,37 @@ func main() {
 	}
 
 	command := os.Args[1]
-	projectID := os.Args[2]
+	projectIDs := strings.Split(os.Args[2], ",")
 
 	ctx := context.Background()
 
 	switch command {
 	case "ips":
-		exportIdleExternalIPsToCSV(ctx, projectID)
+		for _, projectID := range projectIDs {
+			wg.Add(1)
+			exportIdleExternalIPsToCSV(ctx, projectID)
+		}
 	case "instances":
-		exportLongTermTerminatedInstancesToCSV(ctx, projectID, 90)
+		for _, projectID := range projectIDs {
+			wg.Add(1)
+			exportLongTermTerminatedInstancesToCSV(ctx, projectID, 90)
+		}
 	case "firewall":
-		exportPermissiveRulesToCSV(ctx, projectID)
+		for _, projectID := range projectIDs {
+			wg.Add(1)
+			exportPermissiveRulesToCSV(ctx, projectID)
+		}
 	case "all":
-		wg.Add(3)
-		go exportIdleExternalIPsToCSV(ctx, projectID)
-		go exportLongTermTerminatedInstancesToCSV(ctx, projectID, 90)
-		go exportPermissiveRulesToCSV(ctx, projectID)
-		wg.Wait()
+		for _, projectID := range projectIDs {
+			wg.Add(3)
+			go exportIdleExternalIPsToCSV(ctx, projectID)
+			go exportLongTermTerminatedInstancesToCSV(ctx, projectID, 90)
+			go exportPermissiveRulesToCSV(ctx, projectID)
+		}
 	default:
 		fmt.Printf("Command '%s' not found\n", command)
 		os.Exit(1)
 	}
+
+	wg.Wait()
 }

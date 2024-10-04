@@ -4,12 +4,16 @@ import (
 	"encoding/csv"
 	"fmt"
 	"os"
+
+	"github.com/maurifc/gcp-resource-auditor/internal/utils"
 )
 
 func ExportToCSV(header []string, resources [][]string, destinationPath string) error {
 	if len(resources) == 0 {
 		return fmt.Errorf("no resources to export")
 	}
+
+	utils.CreateDestinationDir(destinationPath)
 
 	file, err := os.Create(destinationPath)
 	if err != nil {
