@@ -6,7 +6,7 @@ import (
 	"os"
 )
 
-func ExportToCSV(resources [][]string, destinationPath string) error {
+func ExportToCSV(header []string, resources [][]string, destinationPath string) error {
 	if len(resources) == 0 {
 		return fmt.Errorf("no resources to export")
 	}
@@ -19,6 +19,9 @@ func ExportToCSV(resources [][]string, destinationPath string) error {
 
 	writer := csv.NewWriter(file)
 	defer writer.Flush()
+
+	// write header first
+	writer.Write(header)
 	for _, resource := range resources {
 		writer.Write(resource)
 	}

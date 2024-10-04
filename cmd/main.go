@@ -47,13 +47,14 @@ func exportLongTermTerminatedInstancesToCSV(ctx context.Context, projectId strin
 
 	fmt.Printf("Found %d long term terminated Instances\n", len(longTermTerminatedInstances))
 	for i, instance := range longTermTerminatedInstances {
-		records[i] = compute.GetInstanceSummary(instance).ConvertToStringSlice()
+		records[i] = append(compute.GetInstanceSummary(instance).ConvertToStringSlice(), projectId)
 	}
 
 	destinationFilePath := path.Join(OUTPUT_DIR, TERMINATED_COMPUTE_INSTANCES_FILE)
-	err = export.ExportToCSV(records, destinationFilePath)
+	header := append(compute.GetStructFields(compute.ComputeInstanceSummary{}), "ProjectID")
+	err = export.ExportToCSV(header, records, destinationFilePath)
 	if err != nil {
-		log.Fatalf("Failure when exporting to CSV file")
+		log.Fatalf("Failure when exporting to CSV file", err)
 	}
 
 	fmt.Println("Records saved to", destinationFilePath)
@@ -67,14 +68,15 @@ func exportIdleExternalIPsToCSV(ctx context.Context, projectID string) {
 	records := make([][]string, len(idleExternalIPs))
 	fmt.Printf("Found %d reserved IPs that are not in use\n", len(idleExternalIPs))
 	for i, ip := range idleExternalIPs {
-		records[i] = (*compute.GetIpSummary(ip)).ConvertToStringSlice()
+		records[i] = append((*compute.GetIpSummary(ip)).ConvertToStringSlice(), projectID)
 	}
 
 	destinationFilePath := path.Join(OUTPUT_DIR, IDLE_EXTERNAL_IPS_FILE)
-	err := export.ExportToCSV(records, destinationFilePath)
+	header := append(compute.GetStructFields(compute.IpAddressSummary{}), "ProjectID")
+	err := export.ExportToCSV(header, records, destinationFilePath)
 
 	if err != nil {
-		log.Fatalf("Failure when exporting to CSV file")
+		log.Fatalf("Failure when exporting to CSV file", err)
 	}
 
 	fmt.Println("Records saved to", destinationFilePath)
@@ -96,14 +98,16 @@ func exportPermissiveRulesToCSV(ctx context.Context, projectID string) {
 	}
 
 	for i, rule := range filteredRules {
-		records[i] = (*compute.GetFirewallRuleSummary(rule)).ConvertToStringSlice()
+		record := append((*compute.GetFirewallRuleSummary(rule)).ConvertToStringSlice(), projectID)
+		records[i] = record
 	}
 
 	destinationFilePath := path.Join(OUTPUT_DIR, FIREWALL_RULES_FILE)
-	err := export.ExportToCSV(records, destinationFilePath)
+	header := append(compute.GetStructFields(compute.FirewallRuleSummary{}), "ProjectID")
+	err := export.ExportToCSV(header, records, destinationFilePath)
 
 	if err != nil {
-		log.Fatalf("Failure when exporting to CSV file")
+		log.Fatalf("Failure when exporting to CSV file: ", err)
 	}
 
 	fmt.Println("Records saved to", destinationFilePath)
