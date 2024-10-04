@@ -40,17 +40,13 @@ func GetFirewallRuleSummary(rule *computepb.Firewall) *FirewallRuleSummary {
 	}
 
 	// fillout allowed ports
-	for _, allowed := range rule.Allowed {
-		for _, port := range allowed.Ports {
-			summary.AllowedPorts = append(summary.AllowedPorts, port)
-		}
+	for _, allowRule := range rule.Allowed {
+		summary.AllowedPorts = append(summary.AllowedPorts, allowRule.Ports...)
 	}
 
 	// fillout denied ports
-	for _, denied := range rule.Denied {
-		for _, port := range denied.Ports {
-			summary.DeniedPorts = append(summary.DeniedPorts, port)
-		}
+	for _, denyRule := range rule.Denied {
+		summary.DeniedPorts = append(summary.DeniedPorts, denyRule.Ports...)
 	}
 
 	return &summary
