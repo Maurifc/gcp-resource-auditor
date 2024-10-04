@@ -67,7 +67,7 @@ func (ruleList *FirewallRuleList) FilterByDirection(direction string) (FirewallR
 	}
 
 	for _, rule := range *ruleList {
-		if *rule.Direction == direction {
+		if strings.ToUpper(direction) == *rule.Direction {
 			filteredList = append(filteredList, rule)
 		}
 	}
