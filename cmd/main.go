@@ -6,10 +6,13 @@ import (
 	"log"
 	"os"
 	"path"
+	"sync"
 
 	"github.com/maurifc/gcp-resource-auditor/internal/compute"
 	"github.com/maurifc/gcp-resource-auditor/internal/export"
 )
+
+var wg sync.WaitGroup
 
 const OUTPUT_DIR = "output"
 const TERMINATED_COMPUTE_INSTANCES_FILE = "compute_instances_terminated.csv"
@@ -17,6 +20,7 @@ const IDLE_EXTERNAL_IPS_FILE = "idle_external_ips.csv"
 const FIREWALL_RULES_FILE = "firewall_permissive_rules.csv"
 
 func exportLongTermTerminatedInstancesToCSV(ctx context.Context, projectId string, daysThreshold int) {
+	defer wg.Done()
 	instances, err := compute.ListAllInstances(ctx, projectId)
 	if err != nil {
 		log.Fatalf("Failed to retrieve instances: %v", err)
@@ -61,6 +65,7 @@ func exportLongTermTerminatedInstancesToCSV(ctx context.Context, projectId strin
 }
 
 func exportIdleExternalIPsToCSV(ctx context.Context, projectID string) {
+	defer wg.Done()
 	addresses, _ := compute.ListIpAddresses(ctx, projectID)
 	externalIPs, _ := addresses.AddressType("EXTERNAL")
 	idleExternalIPs, _ := externalIPs.Status("RESERVED")
@@ -83,6 +88,7 @@ func exportIdleExternalIPsToCSV(ctx context.Context, projectID string) {
 }
 
 func exportPermissiveRulesToCSV(ctx context.Context, projectID string) {
+	defer wg.Done()
 	rules, _ := compute.ListAllFirewallRules(ctx, projectID)
 	filteredRules, _ := rules.FilterByStatus("enabled")
 	filteredRules, _ = filteredRules.FilterByAction("allow")
@@ -115,7 +121,7 @@ func exportPermissiveRulesToCSV(ctx context.Context, projectID string) {
 
 func main() {
 	if len(os.Args) != 3 {
-		fmt.Println("Usage: go run cmd/main.go [ ips | instances | firewall ] <project-id>")
+		fmt.Println("Usage: go run cmd/main.go [ ips | instances | firewall | all ] <project-id>")
 		os.Exit(1)
 	}
 
@@ -123,6 +129,7 @@ func main() {
 	projectID := os.Args[2]
 
 	ctx := context.Background()
+
 	switch command {
 	case "ips":
 		exportIdleExternalIPsToCSV(ctx, projectID)
@@ -130,6 +137,12 @@ func main() {
 		exportLongTermTerminatedInstancesToCSV(ctx, projectID, 90)
 	case "firewall":
 		exportPermissiveRulesToCSV(ctx, projectID)
+	case "all":
+		wg.Add(3)
+		go exportIdleExternalIPsToCSV(ctx, projectID)
+		go exportLongTermTerminatedInstancesToCSV(ctx, projectID, 90)
+		go exportPermissiveRulesToCSV(ctx, projectID)
+		wg.Wait()
 	default:
 		fmt.Printf("Command '%s' not found\n", command)
 		os.Exit(1)
