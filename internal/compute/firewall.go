@@ -26,17 +26,12 @@ type FirewallRuleSummary struct {
 func GetFirewallRuleSummary(rule *computepb.Firewall) *FirewallRuleSummary {
 	summary := FirewallRuleSummary{
 		Name:         *rule.Name,
-		Action:       "allow",
+		Action:       getRuleAction(rule),
 		AllowedPorts: make([]string, 0),
 		DeniedPorts:  make([]string, 0),
 		Disabled:     *rule.Disabled,
 		Direction:    *rule.Direction,
 		SourceRanges: rule.SourceRanges,
-	}
-
-	// rule action: allow or deny
-	if len(rule.Denied) > 0 {
-		summary.Action = "deny"
 	}
 
 	// fillout allowed ports
@@ -163,4 +158,12 @@ func ListAllFirewallRules(ctx context.Context, projectID string) (FirewallRuleLi
 	}
 
 	return rules, nil
+}
+
+func getRuleAction(rule *computepb.Firewall) string {
+	if len(rule.Allowed) > 0 {
+		return "allow"
+	}
+
+	return "deny"
 }
