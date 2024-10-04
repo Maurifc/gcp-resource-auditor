@@ -15,7 +15,9 @@ type FirewallRuleList []*computepb.Firewall
 
 type FirewallRuleSummary struct {
 	Name         string
+	Action       string
 	AllowedPorts []string
+	DeniedPorts  []string
 	Disabled     bool
 	Direction    string
 	SourceRanges []string
@@ -24,15 +26,30 @@ type FirewallRuleSummary struct {
 func GetFirewallRuleSummary(rule *computepb.Firewall) *FirewallRuleSummary {
 	summary := FirewallRuleSummary{
 		Name:         *rule.Name,
+		Action:       "allow",
 		AllowedPorts: make([]string, 0),
+		DeniedPorts:  make([]string, 0),
 		Disabled:     *rule.Disabled,
 		Direction:    *rule.Direction,
 		SourceRanges: rule.SourceRanges,
 	}
 
+	// rule action: allow or deny
+	if len(rule.Denied) > 0 {
+		summary.Action = "deny"
+	}
+
+	// fillout allowed ports
 	for _, allowed := range rule.Allowed {
 		for _, port := range allowed.Ports {
 			summary.AllowedPorts = append(summary.AllowedPorts, port)
+		}
+	}
+
+	// fillout denied ports
+	for _, denied := range rule.Denied {
+		for _, port := range denied.Ports {
+			summary.DeniedPorts = append(summary.DeniedPorts, port)
 		}
 	}
 
@@ -42,7 +59,9 @@ func GetFirewallRuleSummary(rule *computepb.Firewall) *FirewallRuleSummary {
 func (ruleSummary *FirewallRuleSummary) ConvertToStringSlice() []string {
 	return []string{
 		ruleSummary.Name,
+		ruleSummary.Action,
 		strings.Join(ruleSummary.AllowedPorts, ";"),
+		strings.Join(ruleSummary.DeniedPorts, ";"),
 		strconv.FormatBool(ruleSummary.Disabled),
 		ruleSummary.Direction,
 		strings.Join(ruleSummary.SourceRanges, ";"),
@@ -112,7 +131,7 @@ func (ruleList *FirewallRuleList) FilterBySourceRange(ipRange string) (FirewallR
 
 	for _, rule := range *ruleList {
 		for _, ips := range rule.SourceRanges {
-			if (strings.Contains(ips, ipRange)) {
+			if strings.Contains(ips, ipRange) {
 				filteredList = append(filteredList, rule)
 			}
 		}
