@@ -14,6 +14,7 @@ import (
 const OUTPUT_DIR = "output"
 const TERMINATED_COMPUTE_INSTANCES_FILE = "compute_instances_terminated.csv"
 const IDLE_EXTERNAL_IPS_FILE = "idle_external_ips.csv"
+const FIREWALL_RULES_FILE = "firewall_permissive_rules.csv"
 
 func exportLongTermTerminatedInstancesToCSV(ctx context.Context, projectId string, daysThreshold int) {
 	instances, err := compute.ListAllInstances(ctx, projectId)
@@ -68,8 +69,37 @@ func exportIdleExternalIPsToCSV(ctx context.Context, projectID string) {
 	for i, ip := range idleExternalIPs {
 		records[i] = (*compute.GetIpSummary(ip)).ConvertToStringSlice()
 	}
-	
+
 	destinationFilePath := path.Join(OUTPUT_DIR, IDLE_EXTERNAL_IPS_FILE)
+	err := export.ExportToCSV(records, destinationFilePath)
+
+	if err != nil {
+		log.Fatalf("Failure when exporting to CSV file")
+	}
+
+	fmt.Println("Records saved to", destinationFilePath)
+}
+
+func exportPermissiveRulesToCSV(ctx context.Context, projectID string) {
+	rules, _ := compute.ListAllFirewallRules(ctx, projectID)
+	filteredRules, _ := rules.FilterByStatus("enabled")
+	filteredRules, _ = filteredRules.FilterByAction("allow")
+	filteredRules, _ = filteredRules.FilterByDirection("ingress")
+	filteredRules, _ = filteredRules.FilterBySourceRange("0.0.0.0/0")
+
+	records := make([][]string, len(filteredRules))
+	fmt.Printf("Found %d permissive firewall rules\n", len(filteredRules))
+
+	if len(filteredRules) == 0 {
+		fmt.Println("Skipping...")
+		return
+	}
+
+	for i, rule := range filteredRules {
+		records[i] = (*compute.GetFirewallRuleSummary(rule)).ConvertToStringSlice()
+	}
+
+	destinationFilePath := path.Join(OUTPUT_DIR, FIREWALL_RULES_FILE)
 	err := export.ExportToCSV(records, destinationFilePath)
 
 	if err != nil {
@@ -81,7 +111,7 @@ func exportIdleExternalIPsToCSV(ctx context.Context, projectID string) {
 
 func main() {
 	if len(os.Args) != 3 {
-		fmt.Println("Usage: go run main.go <project-id> [ ips | instances ]")
+		fmt.Println("Usage: go run cmd/main.go [ ips | instances | firewall ] <project-id>")
 		os.Exit(1)
 	}
 
@@ -94,6 +124,8 @@ func main() {
 		exportIdleExternalIPsToCSV(ctx, projectID)
 	case "instances":
 		exportLongTermTerminatedInstancesToCSV(ctx, projectID, 90)
+	case "firewall":
+		exportPermissiveRulesToCSV(ctx, projectID)
 	default:
 		fmt.Printf("Command '%s' not found\n", command)
 		os.Exit(1)
