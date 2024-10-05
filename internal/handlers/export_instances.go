@@ -55,7 +55,7 @@ func ExportLongTermTerminatedInstancesToCSV(ctx context.Context, projectID strin
 	header := append(compute.GetStructFields(compute.ComputeInstanceSummary{}), "ProjectID")
 	err = export.ExportToCSV(header, records, destinationFilePath)
 	if err != nil {
-		log.Fatalf("Failure when exporting to CSV file", err)
+		log.Fatalf("Failure when exporting to CSV file: %s", err)
 	}
 
 	fmt.Println("Records saved to", destinationFilePath)

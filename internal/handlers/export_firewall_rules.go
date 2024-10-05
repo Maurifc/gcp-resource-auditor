@@ -42,7 +42,7 @@ func ExportPermissiveRulesToCSV(ctx context.Context, projectID string, split boo
 	err := export.ExportToCSV(header, records, destinationFilePath)
 
 	if err != nil {
-		log.Fatalf("Failure when exporting to CSV file: ", err)
+		log.Fatalf("Failure when exporting to CSV file: %s", err)
 	}
 
 	fmt.Println("Records saved to", destinationFilePath)
