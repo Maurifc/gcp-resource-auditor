@@ -20,7 +20,7 @@ const TERMINATED_COMPUTE_INSTANCES_FILE = "compute_instances_terminated.csv"
 const IDLE_EXTERNAL_IPS_FILE = "idle_external_ips.csv"
 const FIREWALL_RULES_FILE = "firewall_permissive_rules.csv"
 
-func exportLongTermTerminatedInstancesToCSV(ctx context.Context, projectID string, daysThreshold int) {
+func exportLongTermTerminatedInstancesToCSV(ctx context.Context, projectID string, daysThreshold int, split bool) {
 	defer wg.Done()
 	instances, err := compute.ListAllInstances(ctx, projectID)
 	if err != nil {
@@ -55,7 +55,11 @@ func exportLongTermTerminatedInstancesToCSV(ctx context.Context, projectID strin
 		records[i] = append(compute.GetInstanceSummary(instance).ConvertToStringSlice(), projectID)
 	}
 
-	destinationFilePath := utils.GetDestinationFilePath(projectID, TERMINATED_COMPUTE_INSTANCES_FILE)
+	prefix := ""
+	if split {
+		prefix = projectID
+	}
+	destinationFilePath := utils.GetDestinationFilePath(prefix, TERMINATED_COMPUTE_INSTANCES_FILE)
 	header := append(compute.GetStructFields(compute.ComputeInstanceSummary{}), "ProjectID")
 	err = export.ExportToCSV(header, records, destinationFilePath)
 	if err != nil {
@@ -65,7 +69,7 @@ func exportLongTermTerminatedInstancesToCSV(ctx context.Context, projectID strin
 	fmt.Println("Records saved to", destinationFilePath)
 }
 
-func exportIdleExternalIPsToCSV(ctx context.Context, projectID string) {
+func exportIdleExternalIPsToCSV(ctx context.Context, projectID string, split bool) {
 	defer wg.Done()
 	addresses, _ := compute.ListIpAddresses(ctx, projectID)
 	externalIPs, _ := addresses.AddressType("EXTERNAL")
@@ -77,7 +81,11 @@ func exportIdleExternalIPsToCSV(ctx context.Context, projectID string) {
 		records[i] = append((*compute.GetIpSummary(ip)).ConvertToStringSlice(), projectID)
 	}
 
-	destinationFilePath := utils.GetDestinationFilePath(projectID, IDLE_EXTERNAL_IPS_FILE)
+	prefix := ""
+	if split {
+		prefix = projectID
+	}
+	destinationFilePath := utils.GetDestinationFilePath(prefix, IDLE_EXTERNAL_IPS_FILE)
 	header := append(compute.GetStructFields(compute.IpAddressSummary{}), "ProjectID")
 	err := export.ExportToCSV(header, records, destinationFilePath)
 
@@ -88,7 +96,7 @@ func exportIdleExternalIPsToCSV(ctx context.Context, projectID string) {
 	fmt.Println("Records saved to", destinationFilePath)
 }
 
-func exportPermissiveRulesToCSV(ctx context.Context, projectID string) {
+func exportPermissiveRulesToCSV(ctx context.Context, projectID string, split bool) {
 	defer wg.Done()
 	rules, _ := compute.ListAllFirewallRules(ctx, projectID)
 	filteredRules, _ := rules.FilterByStatus("enabled")
@@ -109,8 +117,12 @@ func exportPermissiveRulesToCSV(ctx context.Context, projectID string) {
 		records[i] = record
 	}
 
+	prefix := ""
+	if split {
+		prefix = projectID
+	}
+	destinationFilePath := utils.GetDestinationFilePath(prefix, FIREWALL_RULES_FILE)
 	header := append(compute.GetStructFields(compute.FirewallRuleSummary{}), "ProjectID")
-	destinationFilePath := utils.GetDestinationFilePath(projectID, FIREWALL_RULES_FILE)
 	err := export.ExportToCSV(header, records, destinationFilePath)
 
 	if err != nil {
@@ -137,7 +149,7 @@ func getProjectIDsFromStdin() ([]string, error) {
 }
 
 func printUsage() {
-	fmt.Println("Usage: go run cmd/main.go <command> [project-id1,project-id2,...]")
+	fmt.Println("Usage: go run cmd/main.go <command> [project-id1,project-id2,...] [--split]")
 	fmt.Println("  or:  go run cmd/main.go <command> -")
 	fmt.Println("Commands: ips, instances, firewall, all")
 	fmt.Println("Use '-' to read project IDs from stdin")
@@ -148,12 +160,13 @@ func printUsage() {
 }
 
 func main() {
-	if len(os.Args) != 3 {
+	if len(os.Args) < 3 {
 		printUsage()
 		os.Exit(1)
 	}
 
 	command := os.Args[1]
+	splitIntoDirectory := strings.Contains(strings.Join(os.Args, ","), "--split")
 	var projectIDs []string
 	var err error
 	if os.Args[2] != "-" {
@@ -172,24 +185,24 @@ func main() {
 	case "ips":
 		for _, projectID := range projectIDs {
 			wg.Add(1)
-			exportIdleExternalIPsToCSV(ctx, projectID)
+			exportIdleExternalIPsToCSV(ctx, projectID, splitIntoDirectory)
 		}
 	case "instances":
 		for _, projectID := range projectIDs {
 			wg.Add(1)
-			exportLongTermTerminatedInstancesToCSV(ctx, projectID, 90)
+			exportLongTermTerminatedInstancesToCSV(ctx, projectID, 90, splitIntoDirectory)
 		}
 	case "firewall":
 		for _, projectID := range projectIDs {
 			wg.Add(1)
-			exportPermissiveRulesToCSV(ctx, projectID)
+			exportPermissiveRulesToCSV(ctx, projectID, splitIntoDirectory)
 		}
 	case "all":
 		for _, projectID := range projectIDs {
 			wg.Add(3)
-			go exportIdleExternalIPsToCSV(ctx, projectID)
-			go exportLongTermTerminatedInstancesToCSV(ctx, projectID, 90)
-			go exportPermissiveRulesToCSV(ctx, projectID)
+			go exportIdleExternalIPsToCSV(ctx, projectID, splitIntoDirectory)
+			go exportLongTermTerminatedInstancesToCSV(ctx, projectID, 90, splitIntoDirectory)
+			go exportPermissiveRulesToCSV(ctx, projectID, splitIntoDirectory)
 		}
 	default:
 		fmt.Printf("Command '%s' not found\n", command)

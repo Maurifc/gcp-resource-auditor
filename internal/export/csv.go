@@ -9,13 +9,20 @@ import (
 )
 
 func ExportToCSV(header []string, resources [][]string, destinationPath string) error {
+	isAppendMode := false
 	if len(resources) == 0 {
 		return fmt.Errorf("no resources to export")
 	}
 
-	utils.CreateDestinationDir(destinationPath)
+	if _, err := os.Stat(destinationPath); err == nil {
+		isAppendMode = true // file exists, then we want to append to that file
+	}
 
-	file, err := os.Create(destinationPath)
+	if !isAppendMode {
+		utils.CreateDestinationDir(destinationPath)
+	}
+
+	file, err := os.OpenFile(destinationPath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 	if err != nil {
 		return fmt.Errorf("error while creating destination file: %s", err)
 	}
@@ -24,8 +31,11 @@ func ExportToCSV(header []string, resources [][]string, destinationPath string) 
 	writer := csv.NewWriter(file)
 	defer writer.Flush()
 
-	// write header first
-	writer.Write(header)
+	// write header if it's a new file
+	if !isAppendMode {
+		writer.Write(header)
+	}
+
 	for _, resource := range resources {
 		writer.Write(resource)
 	}
