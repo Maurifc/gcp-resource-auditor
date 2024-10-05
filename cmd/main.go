@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"io"
 	"log"
 	"os"
 	"strings"
@@ -119,14 +120,51 @@ func exportPermissiveRulesToCSV(ctx context.Context, projectID string) {
 	fmt.Println("Records saved to", destinationFilePath)
 }
 
+func getProjectIDsFromStdin() ([]string, error) {
+	input, err := io.ReadAll(os.Stdin)
+	if err != nil {
+		return nil, fmt.Errorf("error reading stdin: %v", err)
+	}
+
+	var projectIDs []string
+	for _, id := range strings.Split(string(input), ",") {
+		if trimmedID := strings.TrimSpace(id); trimmedID != "" {
+			projectIDs = append(projectIDs, trimmedID)
+		}
+	}
+
+	return projectIDs, nil
+}
+
+func printUsage() {
+	fmt.Println("Usage: go run cmd/main.go <command> [project-id1,project-id2,...]")
+	fmt.Println("  or:  go run cmd/main.go <command> -")
+	fmt.Println("Commands: ips, instances, firewall, all")
+	fmt.Println("Use '-' to read project IDs from stdin")
+	fmt.Println("Examples:")
+	fmt.Println("  go run cmd/main.go firewall project-id1,project-id2")
+	fmt.Println("  echo 'project-id1,project-id2' | go run cmd/main.go instances -")
+	os.Exit(1)
+}
+
 func main() {
 	if len(os.Args) != 3 {
-		fmt.Println("Usage: go run cmd/main.go [ ips | instances | firewall | all ] <project-id>")
+		printUsage()
 		os.Exit(1)
 	}
 
 	command := os.Args[1]
-	projectIDs := strings.Split(os.Args[2], ",")
+	var projectIDs []string
+	var err error
+	if os.Args[2] != "-" {
+		projectIDs = strings.Split(os.Args[2], ",")
+	} else {
+		projectIDs, err = getProjectIDsFromStdin()
+		if err != nil {
+			log.Fatalf("Could not read Project IDs from STDIN")
+			os.Exit(1)
+		}
+	}
 
 	ctx := context.Background()
 
@@ -155,6 +193,7 @@ func main() {
 		}
 	default:
 		fmt.Printf("Command '%s' not found\n", command)
+		printUsage()
 		os.Exit(1)
 	}
 
